@@ -11,6 +11,11 @@ from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.feature_extraction.text import TfidfTransformer
 from nltk.corpus import stopwords
 import numpy as np
+from nltk.tokenize import word_tokenize
+from nltk import PorterStemmer
+
+porter = PorterStemmer()
+
 COLOR = ['beige','black','blue','brown','green','grey','navy','orange','pink','purple','red','white','yellow','animal','camouflage','dotted','floral','striped','multi']
 MATERIAL = ['cotton','leather','linen','wool','denim','laces','mesh','velvet','satin','faux fur','nylon']
 OCCASION = ['casual','work','party','beach','school','maternity','active','wedding','sexy','bohemian']
@@ -18,17 +23,6 @@ GENDER = ['men','women','baby','kid']
 SEASON = ['spring','summer','autumn','winter']
 
 attr_names = ['ID','genders', 'seasons', 'colors', 'materials', 'occasions', 'brand', 'necks', 'sleeves', 'category']
-
-# genders, seasons, colors, materials, occasions,
-#
-# brand, ID, necks, sleeves,
-#
-# price
-#
-# texts
-#
-# category
-
 
 def txt2csv():
     with open("attributes_79061.txt") as f:
@@ -71,7 +65,8 @@ def build_tf_idf():
     # test_set = ["The sun in the sky is bright."]  # Query
     print "loading corpus..."
     train_set = load_corpus()
-    train_set = train_set[:1000]
+    train_set = train_set
+    print len(train_set)
     stopWords = stopwords.words('english')
 
 
@@ -88,7 +83,7 @@ def build_tf_idf():
     transformer.fit(trainVectorizerArray)
 
     train_corpus = transformer.transform(trainVectorizerArray).toarray()
-    print 'corpus', train_corpus
+    print 'corpus', train_corpus.shape
 
 
 
@@ -131,6 +126,9 @@ def clean_text(str):
     str = rm_digit(str)
     str = rm_char(str)
     str = rm_underscore(str)
+    
+    tokens = word_tokenize(str)
+    str = ' '.join([porter.stem(t) for t in tokens])
     return str
 
 def extract_text():
@@ -148,13 +146,15 @@ if __name__ == '__main__':
     # Step 1: data preparation
 
     # genders, seasons, colors, materials, occasions, brand, ID, necks, sleeves, category
-    # attribute_index()
+    def prepare_data():
+        attribute_index() # attributes
+        build_tf_idf()    # texts
+                          # price
+#     prepare_data()
 
-    # texts index
-    build_tf_idf()
-
-    # price
-    exit()
+    def load_index():
+        index_dir = './index'
+            
 
 
     # Step 2: query
