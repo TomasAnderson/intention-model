@@ -14,6 +14,7 @@ import numpy as np
 from nltk.tokenize import word_tokenize
 from nltk import PorterStemmer
 from PIL import Image
+from sklearn.externals import joblib
 
 porter = PorterStemmer()
 
@@ -23,7 +24,7 @@ OCCASION = ['casual','work','party','beach','school','maternity','active','weddi
 GENDER = ['men','women','baby','kid']
 SEASON = ['spring','summer','autumn','winter']
 
-attr_names = ['ID','genders', 'seasons', 'colors', 'materials', 'occasions', 'brand', 'necks', 'sleeves', 'category']
+attr_names = ['ID','genders', 'seasons', 'colors', 'materials', 'occasions', 'brand', 'necks', 'sleeves', 'category', 'price']
 
 def txt2csv():
     with open("attributes_79061.txt") as f:
@@ -61,41 +62,60 @@ def inverted_index(attr_name):
 
 def attribute_index():
     for attr_name in attr_names:
-        inverted_index(attr_name)
+        if attr_name == 'ID':
+            index_dict = {}
+            with open("attributes_79061.txt") as f:
+                attributes = json.load(f)
+                for i, product in enumerate(attributes['products']):
+                    v = product['ID']
+                    index_dict[i] = v
+            with open("./index/" + attr_name + '_index.pkl', 'wb') as f:
+                pickle.dump(index_dict, f, pickle.HIGHEST_PROTOCOL)
+        elif attr_name == 'price':
+            index_dict = {}
+            with open("attributes_79061.txt") as f:
+                attributes = json.load(f)
+                for product in attributes['products']:
+                    v = product['ID']
+                    p = product['price']
+                    index_dict[v] = p
+            with open('./index/id2price_index.pkl', 'wb') as f:
+                pickle.dump(index_dict, f, pickle.HIGHEST_PROTOCOL)
+        else:
+            inverted_index(attr_name)
 
 def build_tf_idf():
     # test_set = ["The sun in the sky is bright."]  # Query
     print "loading corpus..."
     train_set = load_corpus()
-    train_set = train_set
+    train_set = train_set[:1000]
     print len(train_set)
     stopWords = stopwords.words('english')
 
 
     vectorizer = CountVectorizer(stop_words=stopWords)
     vectorizer.fit(train_set)
-    transformer = TfidfTransformer()
+    joblib.dump(vectorizer, "vectorizer.sav")
 
+    transformer = TfidfTransformer()
     print "vectorising corpus..."
     trainVectorizerArray = vectorizer.transform(train_set).toarray()
-    # testVectorizerArray = vectorizer.transform(test_set).toarray()
-    # print 'Transform Vectorizer to test set', testVectorizerArray
 
     print "tfidf transforming..."
     transformer.fit(trainVectorizerArray)
+    joblib.dump(transformer, 'tfidf_transformer.sav')
 
     train_corpus = transformer.transform(trainVectorizerArray).toarray()
+    np.save("train_corpus.npy", train_corpus)
     print 'corpus', train_corpus.shape
 
 
+def load_tfidf_model():
+    vectorizer = joblib.load("vectorizer.sav")
+    transformer = joblib.load("tfidf_transformer.sav")
+    corpus = np.load("train_corpus.npy")
+    return vectorizer, transformer, corpus
 
-    # transformer.fit(testVectorizerArray)
-
-    # tfidf = transformer.transform(testVectorizerArray)
-    # tfidf = tfidf.todense()
-
-    # test = tfidf
-    # print 'result', np.argmax(np.dot(corpus, test.T))
 def load_corpus():
     if not path.exists("text_corpus.txt"):
         extract_text()
@@ -142,6 +162,108 @@ def extract_text():
                 v = clean_text(v)
                 writer.write(v+"\n")
 
+def tfidf_retrieval(query):
+    vectorizer, transformer, corpus = load_tfidf_model()
+
+    testVectorizerArray = vectorizer.transform([query]).toarray()
+    print 'Transform Vectorizer to test set', testVectorizerArray
+
+    transformer.fit(testVectorizerArray)
+
+    tfidf = transformer.transform(testVectorizerArray)
+    tfidf = tfidf.todense()
+
+    test = tfidf
+    return id_idx[np.argmax(np.dot(corpus, test.T))]
+
+def extract_price(sent):
+    return re.findall('\d+', sent)
+
+def detect_attr(sent):
+    tokens = word_tokenize(sent)
+    tokens = [porter.stem(v) for v in tokens]
+
+    # attribute query
+    results = []
+    intersect_result = set()
+    for t in tokens:
+        if t in brand_idx:
+            results += brand_idx[t]
+            if len(intersect_result) > 0:
+                intersect_result = intersect_result.intersection(brand_idx[t])
+            else:
+                intersect_result = set(brand_idx[t])
+            print "brand detected", len(brand_idx[t]), "results"
+        if t in category_idx:
+            results += category_idx[t]
+            if len(intersect_result) > 0:
+                intersect_result = intersect_result.intersection(category_idx[t])
+            else:
+                intersect_result = set(category_idx[t])
+            print "category detected", len(category_idx[t]), "results"
+        if t in color_idx:
+            results += color_idx[t]
+            if len(intersect_result) > 0:
+                intersect_result = intersect_result.intersection(color_idx[t])
+            else:
+                intersect_result = set(color_idx[t])
+            print "color detected", len(color_idx[t]), "results"
+        if t in gender_idx:
+            results += gender_idx[t]
+            if len(intersect_result) > 0:
+                intersect_result = intersect_result.intersection(gender_idx[t])
+            else:
+                intersect_result = set(gender_idx[t])
+            print "gender detected", len(gender_idx[t]), "results"
+        if t in material_idx:
+            results += material_idx[t]
+            if len(intersect_result) > 0:
+                intersect_result = intersect_result.intersection(material_idx[t])
+            else:
+                intersect_result = set(material_idx[t])
+            print "material detected", len(material_idx[t]), "results"
+        if t in necks_idx:
+            results += necks_idx[t]
+            if len(intersect_result) > 0:
+                intersect_result = intersect_result.intersection(necks_idx[t])
+            else:
+                intersect_result = set(necks_idx[t])
+            print "necks detected", len(necks_idx[t]), "results"
+        if t in occasion_idx:
+            results += occasion_idx[t]
+            if len(intersect_result) > 0:
+                intersect_result = intersect_result.intersection(occasion_idx[t])
+            else:
+                intersect_result = set(occasion_idx[t])
+            print "occasion detected", len(occasion_idx[t]), "results"
+        if t in season_idx:
+            results += season_idx[t]
+            if len(intersect_result) > 0:
+                intersect_result = intersect_result.intersection(season_idx[t])
+            else:
+                intersect_result = set(season_idx[t])
+            print "season detected", len(season_idx[t]), "results"
+        if t in sleeves_idx:
+            results += sleeves_idx[t]
+            if len(intersect_result) > 0:
+                intersect_result = intersect_result.intersection(sleeves_idx[t])
+            else:
+                intersect_result = set(sleeves_idx[t])
+            print "sleeve detected", len(sleeves_idx[t]), "results"
+
+    return list(set(results)), list(intersect_result)
+
+
+
+def search_by_price(price):
+    with open("attributes_79061.txt") as f:
+        attributes = json.load(f)
+        results = []
+        for product in attributes['products']:
+            v = float(product['price'])
+            if abs(price - v) < 50:
+                results.append(product['ID'])
+        return results
 
 
 if __name__ == '__main__':
@@ -150,12 +272,11 @@ if __name__ == '__main__':
     # genders, seasons, colors, materials, occasions, brand, ID, necks, sleeves, category
     def prepare_data():
         attribute_index() # attributes
-        # build_tf_idf()    # texts
+        build_tf_idf()    # texts
                           # price
-    # prepare_data()
+
 
     # step 2: load indexed data
-
     def load_index(attr):
         with open(path.join('./index', attr+'_index.pkl'), 'rb') as f:
             return pickle.load(f)
@@ -169,14 +290,13 @@ if __name__ == '__main__':
     occasion_idx = load_index('occasions') #
     season_idx = load_index('seasons') #
     sleeves_idx = load_index('sleeves')
-
-
+    id_idx = load_index('ID')
+    id2price_idx = load_index('id2price')
 
     BRAND, CATEGORY, NECKS, SLEEVES  = [], [], [], []
     for k in brand_idx:
         BRAND.append(k)
     for k in category_idx:
-        print k
         CATEGORY.append(k)
     for k in necks_idx:
         NECKS.append(k)
@@ -184,93 +304,21 @@ if __name__ == '__main__':
         SLEEVES.append(k)
 
     # Step 3: query
-    def detect_attr(sent):
-        tokens = word_tokenize(sent)
-        tokens = [porter.stem(v) for v in tokens]
-
-        # attribute query
-        results = []
-        intersect_results = set()
-        for t in tokens:
-            if t in brand_idx:
-                print "brand detected"
-                results += brand_idx[t]
-                if len(intersect_results) > 0:
-                    intersect_result.intersection(brand_idx[t])
-                else:
-                    intersect_result = set(brand_idx[t])
-            if t in category_idx:
-                print "category detected"
-                results += category_idx[t]
-                if len(intersect_results) > 0:
-                    intersect_result.intersection(category_idx[t])
-                else:
-                    intersect_result = set(category_idx[t])
-            if t in color_idx:
-                print "color detected"
-                results += color_idx[t]
-                if len(intersect_results) > 0:
-                    intersect_result.intersection(color_idx[t])
-                else:
-                    intersect_result = set(color_idx[t])
-            if t in gender_idx:
-                print "gender detected"
-                results += gender_idx[t]
-                if len(intersect_results) > 0:
-                    intersect_result.intersection(gender_idx[t])
-                else:
-                    intersect_result = set(gender_idx[t])
-            if t in material_idx:
-                print "material detected"
-                results += material_idx[t]
-                if len(intersect_results) > 0:
-                    intersect_result.intersection(material_idx[t])
-                else:
-                    intersect_result = set(material_idx[t])
-            if t in necks_idx:
-                print "necks detected"
-                results += necks_idx[t]
-                if len(intersect_results) > 0:
-                    intersect_result.intersection(necks_idx[t])
-                else:
-                    intersect_result = set(necks_idx[t])
-            if t in occasion_idx:
-                print "occasion detected"
-                results += occasion_idx[t]
-                if len(intersect_results) > 0:
-                    intersect_result.intersection(occasion_idx[t])
-                else:
-                    intersect_result = set(occasion_idx[t])
-            if t in season_idx:
-                print "season detected"
-                results += season_idx[t]
-                if len(intersect_results) > 0:
-                    intersect_result.intersection(season_idx[t])
-                else:
-                    intersect_result = set(season_idx[t])
-            if t in sleeves_idx:
-                print "sleeves detected"
-                results += sleeves_idx[t]
-                if len(intersect_results) > 0:
-                    intersect_result.intersection(sleeves_idx[t])
-                else:
-                    intersect_result = set(sleeves_idx[t])
 
 
-        # tfidf query
-
-
-        return list(set(results)), list(intersect_result)
     while True:
         try:
             utterence = raw_input("Please talk to me: ")
             results, intersect_results = detect_attr(utterence)
+            text_results = tfidf_retrieval(utterence)
 
 
-            if results :
-                # print results
-
-                print len(intersect_results)
+            if intersect_results != None or text_results != None:
+                if intersect_results != None:
+                    print len(intersect_results)
+                else:
+                    print "intersected attribute set size is 0"
+                print text_results, "the price is $", id2price_idx[text_results]
             else:
                 print("not found")
 
