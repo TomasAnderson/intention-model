@@ -27,7 +27,7 @@ SEASON = ['spring','summer','autumn','winter']
 attr_names = ['ID','genders', 'seasons', 'colors', 'materials', 'occasions', 'brand', 'necks', 'sleeves', 'category', 'price']
 
 def txt2csv():
-    with open("attributes_79061.txt") as f:
+    with open("attributes_65572.txt") as f:
         with open("attributes.csv", 'w') as writer:
             results = csv.writer(writer)
             attributes = json.loads(f.readline())
@@ -42,14 +42,14 @@ def txt2csv():
 def inverted_index(attr_name):
     index_dict = {}
     unique_v = 0
-    with open("attributes_79061.txt") as f:
+    with open("attributes_65572.txt") as f:
         attributes = json.load(f)
         for product in attributes['products']:
             v = product[attr_name]
             if not isinstance(v, (list,)):
                 v = [v]
             for elm in v:
-                elm = porter.stem(elm)
+                elm = porter.stem(elm.strip())
                 if elm in index_dict:
                     index_dict[elm].append(product['ID'])
                 else:
@@ -64,7 +64,7 @@ def attribute_index():
     for attr_name in attr_names:
         if attr_name == 'ID':
             index_dict = {}
-            with open("attributes_79061.txt") as f:
+            with open("attributes_65572.txt") as f:
                 attributes = json.load(f)
                 for i, product in enumerate(attributes['products']):
                     v = product['ID']
@@ -73,7 +73,7 @@ def attribute_index():
                 pickle.dump(index_dict, f, pickle.HIGHEST_PROTOCOL)
         elif attr_name == 'price':
             index_dict = {}
-            with open("attributes_79061.txt") as f:
+            with open("attributes_65572.txt") as f:
                 attributes = json.load(f)
                 for product in attributes['products']:
                     v = product['ID']
@@ -154,7 +154,7 @@ def clean_text(str):
     return str
 
 def extract_text():
-    with open("attributes_79061.txt") as f:
+    with open("attributes_65572.txt") as f:
         with open("text_corpus.txt", 'w') as writer:
             attributes = json.load(f)
             for product in attributes['products']:
@@ -256,7 +256,7 @@ def detect_attr(sent):
 
 
 def search_by_price(price):
-    with open("attributes_79061.txt") as f:
+    with open("attributes_65572.txt") as f:
         attributes = json.load(f)
         results = []
         for product in attributes['products']:
@@ -271,10 +271,11 @@ if __name__ == '__main__':
 
     # genders, seasons, colors, materials, occasions, brand, ID, necks, sleeves, category
     def prepare_data():
-        attribute_index() # attributes
+        # attribute_index() # attributes
         build_tf_idf()    # texts
                           # price
-
+    prepare_data()
+    exit()
 
     # step 2: load indexed data
     def load_index(attr):
@@ -304,14 +305,11 @@ if __name__ == '__main__':
         SLEEVES.append(k)
 
     # Step 3: query
-
-
     while True:
         try:
             utterence = raw_input("Please talk to me: ")
             results, intersect_results = detect_attr(utterence)
             text_results = tfidf_retrieval(utterence)
-
 
             if intersect_results != None or text_results != None:
                 if intersect_results != None:
