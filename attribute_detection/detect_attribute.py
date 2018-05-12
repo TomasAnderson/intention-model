@@ -13,6 +13,7 @@ from nltk.corpus import stopwords
 import numpy as np
 from nltk.tokenize import word_tokenize
 from nltk import PorterStemmer
+from PIL import Image
 
 porter = PorterStemmer()
 
@@ -47,6 +48,7 @@ def inverted_index(attr_name):
             if not isinstance(v, (list,)):
                 v = [v]
             for elm in v:
+                elm = porter.stem(elm)
                 if elm in index_dict:
                     index_dict[elm].append(product['ID'])
                 else:
@@ -148,22 +150,127 @@ if __name__ == '__main__':
     # genders, seasons, colors, materials, occasions, brand, ID, necks, sleeves, category
     def prepare_data():
         attribute_index() # attributes
-        build_tf_idf()    # texts
+        # build_tf_idf()    # texts
                           # price
-#     prepare_data()
+    # prepare_data()
 
-    def load_index():
-        index_dir = './index'
-            
+    # step 2: load indexed data
+
+    def load_index(attr):
+        with open(path.join('./index', attr+'_index.pkl'), 'rb') as f:
+            return pickle.load(f)
+
+    brand_idx = load_index('brand')
+    category_idx = load_index('category')
+    color_idx = load_index('colors') #
+    gender_idx = load_index('genders') #
+    material_idx = load_index('materials') #
+    necks_idx = load_index('necks')
+    occasion_idx = load_index('occasions') #
+    season_idx = load_index('seasons') #
+    sleeves_idx = load_index('sleeves')
 
 
-    # Step 2: query
+
+    BRAND, CATEGORY, NECKS, SLEEVES  = [], [], [], []
+    for k in brand_idx:
+        BRAND.append(k)
+    for k in category_idx:
+        print k
+        CATEGORY.append(k)
+    for k in necks_idx:
+        NECKS.append(k)
+    for k in sleeves_idx:
+        SLEEVES.append(k)
+
+    # Step 3: query
+    def detect_attr(sent):
+        tokens = word_tokenize(sent)
+        tokens = [porter.stem(v) for v in tokens]
+
+        # attribute query
+        results = []
+        intersect_results = set()
+        for t in tokens:
+            if t in brand_idx:
+                print "brand detected"
+                results += brand_idx[t]
+                if len(intersect_results) > 0:
+                    intersect_result.intersection(brand_idx[t])
+                else:
+                    intersect_result = set(brand_idx[t])
+            if t in category_idx:
+                print "category detected"
+                results += category_idx[t]
+                if len(intersect_results) > 0:
+                    intersect_result.intersection(category_idx[t])
+                else:
+                    intersect_result = set(category_idx[t])
+            if t in color_idx:
+                print "color detected"
+                results += color_idx[t]
+                if len(intersect_results) > 0:
+                    intersect_result.intersection(color_idx[t])
+                else:
+                    intersect_result = set(color_idx[t])
+            if t in gender_idx:
+                print "gender detected"
+                results += gender_idx[t]
+                if len(intersect_results) > 0:
+                    intersect_result.intersection(gender_idx[t])
+                else:
+                    intersect_result = set(gender_idx[t])
+            if t in material_idx:
+                print "material detected"
+                results += material_idx[t]
+                if len(intersect_results) > 0:
+                    intersect_result.intersection(material_idx[t])
+                else:
+                    intersect_result = set(material_idx[t])
+            if t in necks_idx:
+                print "necks detected"
+                results += necks_idx[t]
+                if len(intersect_results) > 0:
+                    intersect_result.intersection(necks_idx[t])
+                else:
+                    intersect_result = set(necks_idx[t])
+            if t in occasion_idx:
+                print "occasion detected"
+                results += occasion_idx[t]
+                if len(intersect_results) > 0:
+                    intersect_result.intersection(occasion_idx[t])
+                else:
+                    intersect_result = set(occasion_idx[t])
+            if t in season_idx:
+                print "season detected"
+                results += season_idx[t]
+                if len(intersect_results) > 0:
+                    intersect_result.intersection(season_idx[t])
+                else:
+                    intersect_result = set(season_idx[t])
+            if t in sleeves_idx:
+                print "sleeves detected"
+                results += sleeves_idx[t]
+                if len(intersect_results) > 0:
+                    intersect_result.intersection(sleeves_idx[t])
+                else:
+                    intersect_result = set(sleeves_idx[t])
+
+
+        # tfidf query
+
+
+        return list(set(results)), list(intersect_result)
     while True:
         try:
             utterence = raw_input("Please talk to me: ")
-            node = detect_attribute(utterence)
-            if node :
-                print node
+            results, intersect_results = detect_attr(utterence)
+
+
+            if results :
+                # print results
+
+                print len(intersect_results)
             else:
                 print("not found")
 
