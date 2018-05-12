@@ -15,8 +15,10 @@ from nltk.tokenize import word_tokenize
 from nltk import PorterStemmer
 from PIL import Image
 from sklearn.externals import joblib
-
+import os
 porter = PorterStemmer()
+img_dir = '/storage/lzliao/knowfashion_bot/3_taxonomy_traverse/output/product_images_123325/'
+
 
 COLOR = ['beige','black','blue','brown','green','grey','navy','orange','pink','purple','red','white','yellow','animal','camouflage','dotted','floral','striped','multi']
 MATERIAL = ['cotton','leather','linen','wool','denim','laces','mesh','velvet','satin','faux fur','nylon']
@@ -88,7 +90,7 @@ def build_tf_idf():
     # test_set = ["The sun in the sky is bright."]  # Query
     print "loading corpus..."
     train_set = load_corpus()
-    train_set = train_set[:1000]
+    train_set = train_set
     print len(train_set)
     stopWords = stopwords.words('english')
 
@@ -105,8 +107,8 @@ def build_tf_idf():
     transformer.fit(trainVectorizerArray)
     joblib.dump(transformer, 'tfidf_transformer.sav')
 
-    train_corpus = transformer.transform(trainVectorizerArray).toarray()
-    np.save("train_corpus.npy", train_corpus)
+    train_corpus = transformer.transform(trainVectorizerArray)
+    np.save("train_corpus.npy", train_corpus.todense())
     print 'corpus', train_corpus.shape
 
 
@@ -163,16 +165,20 @@ def extract_text():
                 writer.write(v+"\n")
 
 def tfidf_retrieval(query):
-    vectorizer, transformer, corpus = load_tfidf_model()
-
     testVectorizerArray = vectorizer.transform([query]).toarray()
-    print 'Transform Vectorizer to test set', testVectorizerArray
+    print 'Transform Vectorizer to test set', len(testVectorizerArray), testVectorizerArray
+    
+    
+    print 'fitting...'
 
     transformer.fit(testVectorizerArray)
-
+    
+    
+    print 'transforming...'
     tfidf = transformer.transform(testVectorizerArray)
     tfidf = tfidf.todense()
-
+    
+    print 'matching...'
     test = tfidf
     return id_idx[np.argmax(np.dot(corpus, test.T))]
 
@@ -265,19 +271,32 @@ def search_by_price(price):
                 results.append(product['ID'])
         return results
 
-
+    
+    
 if __name__ == '__main__':
     # Step 1: data preparation
+    def imgid2path():
+        category = os.listdir(img_dir)
+        id2path = {}
+        for c in category:
+            img_names = os.listdir(path.join(img_dir, c))
+            for n in img_names:
+                id = n.split("_")[0]
+                id2path[id] = path.join(img_dir, c, n)
+        return id2path
+    id2path = imgid2path()
 
     # genders, seasons, colors, materials, occasions, brand, ID, necks, sleeves, category
     def prepare_data():
         # attribute_index() # attributes
         build_tf_idf()    # texts
-                          # price
-    prepare_data()
-    exit()
 
     # step 2: load indexed data
+    vectorizer, transformer, corpus = load_tfidf_model()
+#     print corpus
+
+
+
     def load_index(attr):
         with open(path.join('./index', attr+'_index.pkl'), 'rb') as f:
             return pickle.load(f)
@@ -317,6 +336,7 @@ if __name__ == '__main__':
                 else:
                     print "intersected attribute set size is 0"
                 print text_results, "the price is $", id2price_idx[text_results]
+                print 'img is at', id2path[text_results]
             else:
                 print("not found")
 
